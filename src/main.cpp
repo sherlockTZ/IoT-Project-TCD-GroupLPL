@@ -123,6 +123,7 @@ void messageHandler(char *topic, byte *payload, unsigned int length)
   deserializeJson(doc, payload);
   const char *message = doc["message"];
   Serial.println(message);
+  int result = doc["result"];
   float air_quality = doc["air_quality"];
   float soung_level = doc["sound_level"];
   for (int i = 0; i < length; i++) 
@@ -132,7 +133,7 @@ void messageHandler(char *topic, byte *payload, unsigned int length)
     char buzzer = (char)payload[62]; // Extracting the controlling command from the Payload to Controlling Buzzer from AWS
     Serial.print("Command: ");
     Serial.println(buzzer);
-    if (air_quality > 500 && sound_level > -5)
+    if (air_quality >= 400 || sound_level > -5 || result == 2)
     {
       digitalWrite(BUZZER_PIN, HIGH);
       delay(1000);
