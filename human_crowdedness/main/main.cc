@@ -14,8 +14,10 @@
 */
 
 #include <stdlib.h>
-
+#include <WiFi.h>
 #include <iostream>
+#include <ArduinoJson.h>
+#include "base64.h"
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -26,7 +28,13 @@
 
 #include "camera_ctrl.h"
 #include "model.h"
+// Replace with your ESP32's IP address when it is set up as an access point
+const char *host = "192.168.4.1";
+const int serverPort = 80;
 
+//set the wifi ssid and password
+const char* ssid = "ESP32AP";
+const char* password = "123456";
 // Set the model variables we will use from all functions.
 const tflite::Model* model = nullptr;
 tflite::MicroInterpreter* interpreter = nullptr;
@@ -128,7 +136,12 @@ void setup() {
  * there's no harm in doing it any way.
  */
 void loop() {
-
+  WIFI.begin(ssid, password);
+  while (WIFI.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting to WiFi..");
+  }
+  Serial.println("Connected to the WiFi network");
   // Get image from provider.
   if (ESP_OK != get_image_from_cam(input->data.int8)) {
     kill_with_error("Camera failed when reading!");
@@ -170,7 +183,31 @@ void loop() {
    * result = 1: Means that there are some people in the room.
    * result = 0: Means that the room is empty.
    */
+  // Send the image data to the ESP32 using a JSON object
+  WiFiClient client;
+  if (!client.connect(host, serverPort)) {
+    Serial.println("Connection to host failed");
+    delay(1000);
+    return;
+  }
+  else{
+    Serial.println("Connection to host success");
+    client.print(String(result));
+    client.stop();
+  }
 
+  size_t img_len = input->bytes;
+  uint8_t *img_buf = input->data.uint8;
+
+  // Create JSON object containing the image data
+  StaticJsonDocument<200> doc;
+  doc["image_data"] = base64::encode(img_buf, img_len);
+
+  // Send the JSON object to the ESP32
+  if (client.connected()) {
+    serializeJson(doc, client);
+    client.println();
+  }
   // Delay the next task so that we can get different results.
   vTaskDelay(100);
 
